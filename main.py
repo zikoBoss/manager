@@ -167,22 +167,20 @@ def install_requirements(bot_folder):
     
     try:
         print(f"[📦] جاري تثبيت المكتبات لـ {bot_folder}...")
-        cmd = [sys.executable, '-m', 'pip', 'install', '-r', req_file,
-               '--target', lib_dir, '--upgrade', '--no-cache-dir', '--no-deps']
+        # تم إزالة --no-deps لتثبيت التبعيات تلقائياً
+        cmd = [sys.executable, '-m', 'pip', 'install', '-r', req_file, '--target', lib_dir, '--upgrade', '--no-cache-dir']
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
         
         if result.returncode == 0:
             print(f"[✅] تم تثبيت المكتبات بنجاح")
-            # إنشاء sitecustomize.py للتأكد من إضافة lib إلى sys.path
-            sitecustomize = os.path.join(bot_folder, 'sitecustomize.py')
-            with open(sitecustomize, 'w', encoding='utf-8') as f:
+            with open(os.path.join(bot_folder, 'sitecustomize.py'), 'w', encoding='utf-8') as f:
                 f.write("""import sys, os
 lib_path = os.path.join(os.path.dirname(__file__), 'lib')
 if lib_path not in sys.path:
     sys.path.insert(0, lib_path)
-print("✅ [sitecustomize] lib added to sys.path")
+print("✅ [sitecustomize] تم إضافة مجلد lib")
 """)
-            return True, "✅ تم تثبيت المكتبات بنجاح"
+            return True, f"✅ تم تثبيت المكتبات بنجاح"
         else:
             print(f"[❌] فشل pip:\n{result.stderr}")
             return False, f"❌ فشل: {result.stderr[:500]}"
