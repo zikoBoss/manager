@@ -38,7 +38,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # ═══════════════════════════════════════════════════════════════
 
 TELEGRAM_BOT_TOKEN = "8598136584:AAFM_fzQv4x5mWFza_BAYtY_jhN1cXXxbqs"
-ADMIN_IDS = [6848455321]
+ADMIN_IDS = [6848455321, 7375963526]
 
 # ملفات التكوين
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "cache")
@@ -684,7 +684,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ أنت لست لديك صلاحية!")
         return
     help_text = """
-🤖 *مدير نظام البوتات - الشمقمق (الإصدار النهائي)*
+🤖 *مدير نظام البوتات - الشمقمق (الإصدار شمقمق 1.0.1)*
 ━━━━━━━━━━━━━━━━━━━━━
 📋 *إدارة البوتات:*
 • `/on [اسم_المجلد]` - تشغيل بوت
