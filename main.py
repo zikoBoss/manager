@@ -1,6 +1,6 @@
-# ملف إدارة نظام البوتات - ZAKARIA (الإصدار الديناميكي)
+# ملف إدارة نظام البوتات - ZAKARIA (الإصدار شمقمق1)
 # الشمقمق
-
+#تغيير الحقوق لن يجعل منك محترفا شمقمق عمك
 import multiprocessing
 from multiprocessing import Manager
 import subprocess
@@ -62,10 +62,7 @@ REQUEST_TIMEOUT = 60
 # إعدادات Free Fire API
 # ═══════════════════════════════════════════════════════════════
 
-GUST = {
-    "4314554831": "hkhangcuti_W2XT3_Developer_PLongDevz_1064J"
-}
-
+GUST = {}  # سيتم تحميلها من الملف
 DEFAULT_REGION = "VN"
 
 # إعداد جلسة الطلبات
@@ -169,7 +166,6 @@ def extract_and_setup_bot(zip_file_path):
     try:
         with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
             zip_ref.extractall(new_folder)
-        # البحث عن main.py (يمكن تعديل لاحقاً للبحث عن أي ملف .py)
         main_file = None
         for root, dirs, files in os.walk(new_folder):
             if 'main.py' in files:
@@ -178,7 +174,6 @@ def extract_and_setup_bot(zip_file_path):
         if not main_file:
             shutil.rmtree(new_folder)
             return None, "لم يتم العثور على main.py"
-        # الملف الرئيسي بالنسبة للمجلد
         main_file_rel = os.path.relpath(main_file, new_folder)
         return new_folder, main_file_rel
     except Exception as e:
@@ -187,45 +182,124 @@ def extract_and_setup_bot(zip_file_path):
         return None, str(e)
 
 # ═══════════════════════════════════════════════════════════════
-# دوال التشفير و JWT (Free Fire) - نسخة محلية بالكامل
+# دوال التشفير الأساسية (لإضافة الصديق)
 # ═══════════════════════════════════════════════════════════════
+
+def encrypt_api(plain_text):
+    plain_text = bytes.fromhex(plain_text)
+    key = bytes([89, 103, 38, 116, 99, 37, 68, 69, 117, 104, 54, 37, 90, 99, 94, 56])
+    iv = bytes([54, 111, 121, 90, 68, 114, 50, 50, 69, 51, 121, 99, 104, 106, 77, 37])
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    cipher_text = cipher.encrypt(pad(plain_text, AES.block_size))
+    return cipher_text.hex()
+
+def Encrypt_ID(number):
+    number = int(number)
+    encoded_bytes = []
+    while True:
+        byte = number & 0x7F
+        number >>= 7
+        if number:
+            byte |= 0x80
+        encoded_bytes.append(byte)
+        if not number:
+            break
+    return bytes(encoded_bytes).hex()
+
+# ═══════════════════════════════════════════════════════════════
+# دوال الحصول على التوكن (جديدة من index.py)
+# ═══════════════════════════════════════════════════════════════
+
+# بيانات ثابتة مطلوبة في TOKEN_MAKER
+OLD_ACCESS_TOKEN = "c69ae208fad72738b674b2847b50a3a1dfa25d1a19fae745fc76ac4a0e414c94"
+OLD_OPEN_ID = "4306245793de86da425a52caadf21eed"
+
+def TOKEN_MAKER(OLD_ACCESS_TOKEN, NEW_ACCESS_TOKEN, OLD_OPEN_ID, NEW_OPEN_ID, uid):
+    """صانع التوكن - نفس الموجود في index.py"""
+    now = datetime.now()
+    now = str(now)[:len(str(now)) - 7]
+
+    data = bytes.fromhex(
+        '1a13323032352d31312d32362030313a35313a3238220966726565206669726528013a07312e3132302e314232416e64726f6964204f532039202f204150492d3238202850492f72656c2e636a772e32303232303531382e313134313333294a0848616e6468656c64520c4d544e2f537061636574656c5a045749464960800a68d00572033234307a2d7838362d3634205353453320535345342e3120535345342e32204156582041565832207c2032343030207c20348001e61e8a010f416472656e6f2028544d292036343092010d4f70656e474c20455320332e329a012b476f6f676c657c36323566373136662d393161372d343935622d396631362d303866653964336336353333a2010e3137362e32382e3133392e313835aa01026172b201203433303632343537393364653836646134323561353263616164663231656564ba010134c2010848616e6468656c64ca010d4f6e65506c7573204135303130ea014063363961653230386661643732373338623637346232383437623530613361316466613235643161313966616537343566633736616334613065343134633934f00101ca020c4d544e2f537061636574656cd2020457494649ca03203161633462383065636630343738613434323033626638666163363132306635e003b5ee02e8039a8002f003af13f80384078004a78f028804b5ee029004a78f029804b5ee02b00404c80401d2043d2f646174612f6170702f636f6d2e6474732e667265656669726574682d66705843537068495636644b43376a4c2d574f7952413d3d2f6c69622f61726de00401ea045f65363261623933353464386662356662303831646233333861636233333439317c2f646174612f6170702f636f6d2e6474732e667265656669726574682d66705843537068495636644b43376a4c2d574f7952413d3d2f626173652e61706bf00406f804018a050233329a050a32303139313139303236a80503b205094f70656e474c455332b805ff01c00504e005be7eea05093372645f7061727479f205704b717348543857393347646347335a6f7a454e6646775648746d377171316552554e6149444e67526f626f7a4942744c4f695943633459367a767670634943787a514632734f453463627974774c7334785a62526e70524d706d5752514b6d654f35766373386e51594268777148374bf805e7e4068806019006019a060134a2060134b2062213521146500e590349510e460900115843395f005b510f685b560a6107576d0f0366'
+    )
+
+    data = data.replace(OLD_OPEN_ID.encode(), NEW_OPEN_ID.encode())
+    data = data.replace(OLD_ACCESS_TOKEN.encode(), NEW_ACCESS_TOKEN.encode())
+
+    encrypted = encrypt_api(data.hex())
+    Final_Payload = bytes.fromhex(encrypted)
+
+    headers = {
+        'X-Unity-Version': '2018.4.11f1',
+        'ReleaseVersion': 'ob52',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-GA': 'v1 1',
+        'Authorization': 'Bearer ...',
+        'Content-Length': '928',
+        'User-Agent': 'Dalvik/2.1.0',
+        'Host': 'loginbp.ggpolarbear.com',
+        'Connection': 'Keep-Alive',
+        'Accept-Encoding': 'gzip'
+    }
+
+    url = "https://loginbp.ggpolarbear.com/MajorLogin"
+    response = session.post(url, headers=headers, data=Final_Payload, verify=False)
+
+    if response.status_code == 200:
+        if len(response.text) < 10:
+            return False
+
+        base = response.text[
+            response.text.find("eyJhbGciOiJIUzI1NiIsInN2ciI6IjEiLCJ0eXAiOiJKV1QifQ"):
+            -1
+        ]
+
+        second_dot = base.find(".", base.find(".") + 1)
+        base = base[:second_dot + 44]
+        return base
+    return False
+
+def get_fresh_token(uid, password):
+    """الحصول على JWT اللعبة باستخدام uid و password (نفس index.py)"""
+    try:
+        # الخطوة 1: الحصول على access_token من Garena
+        url = "https://100067.connect.garena.com/oauth/guest/token/grant"
+        headers = {
+            "Host": "100067.connect.garena.com",
+            "User-Agent": "GarenaMSDK/4.0.19P4",
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+        data = {
+            "uid": uid,
+            "password": password,
+            "response_type": "token",
+            "client_type": "2",
+            "client_id": "100067",
+            "client_secret": ""
+        }
+        r = session.post(url, headers=headers, data=data, timeout=30)
+        if r.status_code != 200:
+            print(f"[❌] فشل الاتصال بـ Garena: {r.status_code}")
+            return None
+        d = r.json()
+        NEW_ACCESS_TOKEN = d.get("access_token")
+        NEW_OPEN_ID = d.get("open_id")
+        if not NEW_ACCESS_TOKEN or not NEW_OPEN_ID:
+            print("[❌] لم يتم استلام التوكن من Garena")
+            return None
+        # الخطوة 2: إنشاء JWT اللعبة باستخدام TOKEN_MAKER
+        jwt = TOKEN_MAKER(OLD_ACCESS_TOKEN, NEW_ACCESS_TOKEN, OLD_OPEN_ID, NEW_OPEN_ID, uid)
+        return jwt
+    except Exception as e:
+        print(f"[❌] خطأ في get_fresh_token: {e}")
+        return None
 
 def get_jwt(uid, password):
-    """الحصول على access_token من Garena باستخدام uid و password"""
-    url = "https://100067.connect.garena.com/oauth/guest/token/grant"
-    headers = {
-        "Accept-Encoding": "gzip",
-        "Connection": "Keep-Alive",
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Host": "100067.connect.garena.com",
-        "User-Agent": "GarenaMSDK/4.0.19P8(ASUS_Z01QD ;Android 12;en;US;)",
-    }
-    data = {
-        "uid": uid,
-        "password": password,
-        "response_type": "token",
-        "client_type": "2",
-        "client_secret": "2ee44819e9b4598845141067b281621874d0d5d7af9d8f7e00c1e54715b7d1e3",
-        "client_id": "100067"
-    }
-    for attempt in range(MAX_RETRIES):
-        try:
-            response = session.post(url, headers=headers, data=data, timeout=30)
-            if response.status_code == 200:
-                resp_json = response.json()
-                token = resp_json.get("access_token")
-                if token:
-                    return token
-            if attempt < MAX_RETRIES - 1:
-                time.sleep(RETRY_DELAY)
-        except Exception as e:
-            print(f"❌ خطأ في استرجاع JWT (المحاولة {attempt+1}): {e}")
-            if attempt < MAX_RETRIES - 1:
-                time.sleep(RETRY_DELAY)
-    return None
+    """الحصول على JWT اللعبة باستخدام uid و password (واجهة موحدة)"""
+    return get_fresh_token(uid, password)
 
 # ═══════════════════════════════════════════════════════════════
-# دوال تغيير البايو الجديدة (OB52)
+# دوال تغيير البايو (OB52)
 # ═══════════════════════════════════════════════════════════════
 
 K_bio = b"Yg&tc%DEuh6%Zc^8"
@@ -377,16 +451,12 @@ def set_bio_with_jwt(jwt, text):
     return r.status_code
 
 def change_bio_sync(uid, password, new_bio):
-    """تغيير البايو بشكل متزامن (يستخدم uid/password)"""
-    token = get_jwt(uid, password)  # access token من الـ API القديم
-    if not token:
-        return {'status': 'فشل', 'error': 'فشل في الحصول على التوكن', 'uid': uid}
+    """تغيير البايو باستخدام uid/password"""
+    jwt = get_jwt(uid, password)  # JWT اللعبة مباشرة
+    if not jwt:
+        return {'status': 'فشل', 'error': 'فشل في الحصول على JWT', 'uid': uid}
     try:
-        open_id, _ = inspect_token(token)
-        if not open_id:
-            return {'status': 'فشل', 'error': 'open_id غير موجود', 'uid': uid}
-        game_token = get_game_token(token, open_id)
-        status = set_bio_with_jwt(game_token, new_bio)
+        status = set_bio_with_jwt(jwt, new_bio)
         if status == 200:
             return {'status': 'نجاح', 'uid': uid}
         else:
@@ -395,11 +465,11 @@ def change_bio_sync(uid, password, new_bio):
         return {'status': 'خطأ', 'error': str(e)[:50], 'uid': uid}
 
 # ═══════════════════════════════════════════════════════════════
-# إضافة صديق مع إعادة المحاولة (Free Fire)
+# إضافة صديق مع إعادة المحاولة (OB52)
 # ═══════════════════════════════════════════════════════════════
 
 async def async_add_fr_with_retry(target_id, token, uid, semaphore, client):
-    url = 'https://clientbp.ggwhitehawk.com/RequestAddingFriend'
+    url = 'https://clientbp.ggpolarbear.com/RequestAddingFriend'
     headers = {
         'X-Unity-Version': '2018.4.11f1',
         'ReleaseVersion': 'OB52',
@@ -407,7 +477,7 @@ async def async_add_fr_with_retry(target_id, token, uid, semaphore, client):
         'X-GA': 'v1 1',
         'Authorization': f'Bearer {token}',
         'User-Agent': 'Dalvik/2.1.0 (Linux; U; Android 7.1.2; ASUS_Z01QD Build/QKQ1.190825.002)',
-        'Host': 'clientbp.ggwhitehawk.com',
+        'Host': 'clientbp.ggpolarbear.com',
         'Connection': 'Keep-Alive',
         'Accept-Encoding': 'gzip'
     }
@@ -451,17 +521,14 @@ async def async_add_fr_single(target_id, token, uid):
 # ═══════════════════════════════════════════════════════════════
 
 async def async_change_bio_with_retry(uid, password, new_bio, region, semaphore, client):
-    """تغيير البايو باستخدام الكود الجديد (يعمل بشكل متزامن ولكن نستخدم asyncio.to_thread)"""
     async with semaphore:
         for attempt in range(MAX_RETRIES):
             if attempt > 0:
                 await asyncio.sleep(RETRY_DELAY)
             try:
-                # تشغيل الدالة المتزامنة في thread منفصل
                 result = await asyncio.to_thread(change_bio_sync, uid, password, new_bio)
                 if result.get('status') == 'نجاح':
                     return result
-                # إذا فشل، نعيد المحاولة
                 if attempt < MAX_RETRIES - 1:
                     continue
                 return result
@@ -474,7 +541,6 @@ async def async_change_bio_with_retry(uid, password, new_bio, region, semaphore,
 async def async_change_bio_single(uid, password, new_bio, region):
     semaphore = asyncio.Semaphore(1)
     async with httpx.AsyncClient(verify=False) as client:
-        # client غير مستخدم فعلياً، لكن نحتفظ بالواجهة للتوافق
         return await async_change_bio_with_retry(uid, password, new_bio, region, semaphore, client)
 
 # ═══════════════════════════════════════════════════════════════
@@ -482,9 +548,6 @@ async def async_change_bio_single(uid, password, new_bio, region):
 # ═══════════════════════════════════════════════════════════════
 
 def run_single_bot(folder, filename, bot_id, status_dict, stop_event, error_dict):
-    """
-    bot_id هو اسم المجلد (مثل "bot1")
-    """
     ensure_log_dir()
     log_file = os.path.join(LOG_DIR, f"{bot_id}.log")
     while not stop_event.is_set():
@@ -548,7 +611,6 @@ def run_single_bot(folder, filename, bot_id, status_dict, stop_event, error_dict
     print(f"[إيقاف] البوت {bot_id}")
 
 def start_bot_process(bot_folder, status_dict, stop_events, error_dict):
-    """تشغيل بوت جديد باستخدام اسم المجلد"""
     bots = load_bots_config()
     bot_info = next((b for b in bots if b['folder'] == bot_folder), None)
     if not bot_info:
@@ -570,7 +632,6 @@ def start_bot_process(bot_folder, status_dict, stop_events, error_dict):
     return True, f"✅ تم تشغيل البوت {bot_folder}: {folder}/{filename}"
 
 def stop_bot_process(bot_folder, status_dict, stop_events):
-    """إيقاف بوت"""
     if bot_folder not in bot_processes or not bot_processes[bot_folder].is_alive():
         return False, f"⚠️ البوت {bot_folder} غير مشتغل!"
     if bot_folder in stop_events:
@@ -582,7 +643,6 @@ def stop_bot_process(bot_folder, status_dict, stop_events):
     return True, f"✅ تم إيقاف البوت {bot_folder}"
 
 def restart_bot_process(bot_folder, status_dict, stop_events, error_dict):
-    """إعادة تشغيل بوت"""
     if bot_folder in bot_processes and bot_processes[bot_folder].is_alive():
         if bot_folder in stop_events:
             stop_events[bot_folder].set()
@@ -605,7 +665,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ أنت لست لديك صلاحية!")
         return
     help_text = """
-🤖 *مدير نظام البوتات - الشمقمق (النسخة الشمقمقية)*
+🤖 *مدير نظام البوتات - الشمقمق (الإصدار النهائي)*
 ━━━━━━━━━━━━━━━━━━━━━
 📋 *إدارة البوتات:*
 • `/on [اسم_المجلد]` - تشغيل بوت
@@ -617,7 +677,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 • `/status` - حالة البوتات
 • `/log [اسم_المجلد]` - عرض السجل
 • `/listbots` - قائمة البوتات المسجلة
-• `/addbot` - لاستقبال ملف ZIP لإضافة بوت جديد (سيرسل البوت طلب الملف)
+• `/addbot` - لاستقبال ملف ZIP لإضافة بوت جديد
 • `/delbot [اسم_المجلد]` - حذف بوت
 ━━━━━━━━━━━━━━━━━━━━━
 🎮 *Free Fire:*
@@ -635,52 +695,35 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(help_text, parse_mode='Markdown')
 
 async def cmd_addbot_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """يطلب من المستخدم إرسال ملف ZIP لإضافة بوت جديد"""
     user_id = update.effective_user.id
     if not is_admin(user_id):
         await update.message.reply_text("⛔ ليس لديك صلاحية!")
         return
-
-    # تخزين حالة انتظار الملف للمستخدم
     context.user_data['waiting_for_bot_zip'] = True
     await update.message.reply_text("📦 أرسل ملف ZIP الذي يحتوي على `main.py` (الملف الرئيسي للبوت).", parse_mode='Markdown')
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة الملفات المرسلة بعد طلب /addbot"""
     user_id = update.effective_user.id
     if not is_admin(user_id):
         await update.message.reply_text("⛔ ليس لديك صلاحية!")
         return
-
-    # التحقق من أن المستخدم في حالة انتظار الملف
     if not context.user_data.get('waiting_for_bot_zip', False):
-        # إذا لم يكن ينتظر ملفاً، نهمل
         return
-
-    # مسح حالة الانتظار
     context.user_data['waiting_for_bot_zip'] = False
-
     document = update.message.document
     if not document or not document.file_name.endswith('.zip'):
         await update.message.reply_text("❗ يرجى إرسال ملف بصيغة ZIP فقط.")
         return
-
-    # تحميل الملف
     await update.message.reply_text("⏳ جاري تحميل الملف...")
     file = await context.bot.get_file(document.file_id)
     temp_zip = os.path.join(CACHE_DIR, f"temp_{document.file_id}.zip")
     await file.download_to_drive(temp_zip)
-
-    # فك الضغط وإعداد البوت
     await update.message.reply_text("⏳ جاري فك الضغط وإعداد البوت...")
     folder, main_file = extract_and_setup_bot(temp_zip)
     os.remove(temp_zip)
-
     if not folder:
         await update.message.reply_text(f"❌ فشل في إعداد البوت: {main_file}")
         return
-
-    # إضافة البوت إلى القائمة
     bots = load_bots_config()
     new_bot = {
         "folder": folder,
@@ -689,13 +732,10 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
     bots.append(new_bot)
     save_bots_config(bots)
-
-    # تشغيل البوت الجديد
     status_dict = context.bot_data.get('status_dict')
     stop_events = context.bot_data.get('stop_events')
     error_dict = context.bot_data.get('error_dict')
     success, msg = start_bot_process(folder, status_dict, stop_events, error_dict)
-
     await update.message.reply_text(f"✅ تمت إضافة البوت `{folder}`\n📁 {folder}\n🔧 {main_file}\n{msg}", parse_mode='Markdown')
 
 async def cmd_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -864,28 +904,20 @@ async def cmd_delbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❗ /delbot [اسم_المجلد]")
         return
     bot_folder = context.args[0]
-
     bots = load_bots_config()
     bot_info = next((b for b in bots if b['folder'] == bot_folder), None)
     if not bot_info:
         await update.message.reply_text(f"❌ البوت {bot_folder} غير موجود!")
         return
-
-    # إيقاف البوت إن كان يعمل
     status_dict = context.bot_data.get('status_dict')
     stop_events = context.bot_data.get('stop_events')
     if bot_folder in bot_processes and bot_processes[bot_folder].is_alive():
         stop_bot_process(bot_folder, status_dict, stop_events)
-
-    # حذف مجلد البوت
     folder_path = bot_info['folder']
     if os.path.exists(folder_path):
         shutil.rmtree(folder_path)
-
-    # إزالة من القائمة
     bots = [b for b in bots if b['folder'] != bot_folder]
     save_bots_config(bots)
-
     await update.message.reply_text(f"✅ تم حذف البوت {bot_folder} ومجلده {folder_path}")
 
 # ═══════════════════════════════════════════════════════════════
@@ -1107,11 +1139,10 @@ def run_web_server():
     port = int(os.environ.get("PORT", 10000))
     web_app.run(host="0.0.0.0", port=port, debug=False)
 
-# تشغيل الخادم في thread منفصل (يتم استدعاؤه قبل run_telegram_bot)
 def start_flask_thread():
     web_thread = threading.Thread(target=run_web_server, daemon=True)
     web_thread.start()
-    print(f"?? خادم HTTP يعمل على المنفذ {os.environ.get('PORT', 10000)}")
+    print(f"🌐 خادم HTTP يعمل على المنفذ {os.environ.get('PORT', 10000)}")
 
 # ═══════════════════════════════════════════════════════════════
 # الشمقمق
@@ -1124,7 +1155,6 @@ if __name__ == "__main__":
     ensure_cache_dir()
     ensure_log_dir()
 
-    # تشغيل خادم Flask (لإبقاء الخدمة على Render)
     start_flask_thread()
 
     manager = Manager()
@@ -1132,7 +1162,6 @@ if __name__ == "__main__":
     error_dict = manager.dict()
     stop_events = {}
 
-    # تحميل البوتات المسجلة
     bots = load_bots_config()
     print(f"\n📍 جاري تحميل {len(bots)} بوت مسجل...")
 
