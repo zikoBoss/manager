@@ -19,6 +19,12 @@ import sys
 import zipfile
 import shutil
 from pathlib import Path
+import threading
+from flask import Flask
+from cryptography.hazmat.primitives.ciphers import Cipher as Cp, algorithms as Al, modes as Md
+from cryptography.hazmat.backends import default_backend as Bk
+from google.protobuf.internal.decoder import _DecodeVarint32
+from datetime import datetime
 
 # مكتبات تليجرام
 from telegram import Update
@@ -251,6 +257,176 @@ def get_jwt(uid, password):
     return None
 
 # ═══════════════════════════════════════════════════════════════
+# دوال تغيير البايو الجديدة (OB52)
+# ═══════════════════════════════════════════════════════════════
+
+K_bio = b"Yg&tc%DEuh6%Zc^8"
+IV_bio = b"6oyZDr22E3ychjM%"
+
+def pad_bio(d):
+    n = 16 - (len(d) % 16)
+    return d + bytes([n] * n)
+
+def unpad_bio(d):
+    p = d[-1]
+    return d[:-p] if 1 <= p <= 16 else d
+
+def encrypt_bio(b):
+    cipher = Cp(Al.AES(K_bio), Md.CBC(IV_bio), backend=Bk())
+    encryptor = cipher.encryptor()
+    return encryptor.update(pad_bio(b)) + encryptor.finalize()
+
+def decrypt_bio(b):
+    cipher = Cp(Al.AES(K_bio), Md.CBC(IV_bio), backend=Bk())
+    decryptor = cipher.decryptor()
+    return unpad_bio(decryptor.update(b) + decryptor.finalize())
+
+def protobuf_decode(data):
+    """فك ترميز رسالة protobuf"""
+    i, out = 0, {}
+    while i < len(data):
+        try:
+            key, i = _DecodeVarint32(data, i)
+        except:
+            break
+        fn, wt = key >> 3, key & 0x7
+        if wt == 0:
+            v, i = _DecodeVarint32(data, i)
+            out[str(fn)] = {"t": "int", "v": v}
+        elif wt == 2:
+            ln, i = _DecodeVarint32(data, i)
+            v = data[i:i+ln]
+            i += ln
+            try:
+                out[str(fn)] = {"t": "str", "v": v.decode()}
+            except:
+                out[str(fn)] = {"t": "hex", "v": v.hex()}
+        elif wt == 1:
+            out[str(fn)] = {"t": "64b", "v": data[i:i+8].hex()}
+            i += 8
+        elif wt == 5:
+            out[str(fn)] = {"t": "32b", "v": data[i:i+4].hex()}
+            i += 4
+        else:
+            break
+    return out
+
+def inspect_token(access_token):
+    """التحقق من صحة التوكن وجلب open_id"""
+    url = "https://100067.connect.garena.com/oauth/token/inspect"
+    headers = {
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "close",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Host": "100067.connect.garena.com",
+        "User-Agent": "GarenaMSDK/4.0.19P4(G011A ;Android 9;en;US;)",
+    }
+    r = session.get(url, params={"token": access_token}, headers=headers, timeout=10)
+    data = r.json()
+    if "error" in data:
+        raise Exception(f"token error: {data['error']}")
+    return data.get("open_id"), data.get("platform")
+
+def build_login_data(access_token, open_id):
+    """بناء البيانات المشفرة لتسجيل الدخول إلى اللعبة"""
+    template_hex = (
+        "1a13323032352d30372d33302031343a31313a3230220966726565206669726528013a07"
+        "322e3131342e324234416e64726f6964204f53203133202f204150492d33332028545031"
+        "412e3232303632342e3031342f3235303531355631393737294a0848616e6468656c6452"
+        "094f72616e676520544e5a0457494649609c1368b80872033438307a1d41524d3634204650"
+        "204153494d4420414553207c2032303030207c20388001973c8a010c4d616c692d473532"
+        "204d433292013e4f70656e474c20455320332e322076312e72333270312d3031656163302e"
+        "32613839336330346361303032366332653638303264626537643761663563359a012b476f"
+        "6f676c657c61326365613833342d353732362d346235622d383666322d373130356364386666"
+        "353530a2010e3139362e3138372e3132382e3334aa0102656eb201203965373166616266343364"
+        "383863303662373966353438313034633766636237ba010134c2010848616e6468656c64ca0115"
+        "494e46494e495820496e66696e6978205836383336ea014063363231663264363231343330646163"
+        "316137383261306461623634653663383061393734613662633732386366326536623132323464313836"
+        "633962376166f00101ca02094f72616e676520544ed2020457494649ca03203161633462383065636630"
+        "343738613434323033626638666163363132306635e003dc810ee803daa106f003ef068004e7a506"
+        "8804dc810e9004e7a5069804dc810ec80403d2045b2f646174612f6170702f7e7e73444e524632"
+        "526357313830465a4d66624d5a636b773d3d2f636f6d2e6474732e66726565666972656d61782d"
+        "4a534d4f476d33464e59454271535376587767495a413d3d2f6c69622f61726d3634e00402ea047b"
+        "61393862306265333734326162303061313966393737633637633031633266617c2f646174612f6170"
+        "702f7e7e73444e524632526357313830465a4d66624d5a636b773d3d2f636f6d2e6474732e66726565"
+        "666972656d61782d4a534d4f476d33464e59454271535376587767495a413d3d2f626173652e61706b"
+        "f00402f804028a050236349a050a32303139313135363537a80503b205094f70656e474c455333b805"
+        "ff7fc00504d20506526164c3a873da05023133e005b9f601ea050b616e64726f69645f6d6178f2055c"
+        "4b71734854346230414a3777466c617231594d4b693653517a6732726b3665764f38334f306f59306763"
+        "635a626457467a785633483564454f586a47704e3967476956774b7533547a312b716a36326546673074"
+        "627537664350553d8206147b226375725f72617465223a5b36302c39305d7d880601900601"
+        "9a060134a2060134b20600"
+    )
+    data_bytes = bytes.fromhex(template_hex)
+    # استبدال الطابع الزمني
+    timestamp = str(datetime.now())[:-7].encode()
+    data_bytes = data_bytes.replace(b"2025-07-30 14:11:20", timestamp)
+    # استبدال access_token و open_id
+    data_bytes = data_bytes.replace(b"c621f2d621430dac1a782a0dab64e6c80a974a6bc728cf2e6b1224d186c9b7af", access_token.encode())
+    data_bytes = data_bytes.replace(b"9e71fabf43d88c06b79f548104c7fcb7", open_id.encode())
+    return encrypt_bio(data_bytes)
+
+def get_game_token(access_token, open_id):
+    """الحصول على JWT الخاص باللعبة باستخدام access_token"""
+    payload = build_login_data(access_token, open_id)
+    url = "https://loginbp.common.ggbluefox.com/MajorLogin"
+    headers = {
+        "Expect": "100-continue",
+        "X-Unity-Version": "2018.4.11f1",
+        "X-GA": "v1 1",
+        "ReleaseVersion": "OB52",
+        "Authorization": "Bearer ",
+        "Host": "loginbp.common.ggbluefox.com",
+        "User-Agent": "Dalvik/2.1.0 (Linux; U; Android 13; A063)",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept-Encoding": "gzip",
+    }
+    r = session.post(url, data=payload, headers=headers, timeout=20)
+    if r.status_code != 200:
+        raise Exception(f"MajorLogin failed with status {r.status_code}")
+    decoded = protobuf_decode(r.content)
+    token = decoded.get("8", {}).get("v", "")
+    if not token:
+        raise Exception("No token in response")
+    return token.strip()
+
+def set_bio_with_jwt(jwt, text):
+    """تغيير البايو باستخدام JWT"""
+    raw = b"\x10\x11\x42" + bytes([len(text.encode())]) + text.encode() + b"\x48\x01"
+    url = "https://clientbp.ggpolarbear.com/UpdateSocialBasicInfo"
+    headers = {
+        "User-Agent": "Dalvik/2.1.0 (Linux; U; Android 13; A063 Build/TKQ1.221220.001)",
+        "Connection": "Keep-Alive",
+        "Accept-Encoding": "gzip",
+        "Expect": "100-continue",
+        "Authorization": f"Bearer {jwt}",
+        "X-Unity-Version": "2018.4.11f1",
+        "X-GA": "v1 1",
+        "ReleaseVersion": "OB52",
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+    r = session.post(url, data=encrypt_bio(raw), headers=headers, timeout=15)
+    return r.status_code
+
+def change_bio_sync(uid, password, new_bio):
+    """تغيير البايو بشكل متزامن (يستخدم uid/password)"""
+    token = get_jwt(uid, password)  # access token من الـ API القديم
+    if not token:
+        return {'status': 'فشل', 'error': 'فشل في الحصول على التوكن', 'uid': uid}
+    try:
+        open_id, _ = inspect_token(token)
+        if not open_id:
+            return {'status': 'فشل', 'error': 'open_id غير موجود', 'uid': uid}
+        game_token = get_game_token(token, open_id)
+        status = set_bio_with_jwt(game_token, new_bio)
+        if status == 200:
+            return {'status': 'نجاح', 'uid': uid}
+        else:
+            return {'status': 'فشل', 'error': f'HTTP {status}', 'uid': uid}
+    except Exception as e:
+        return {'status': 'خطأ', 'error': str(e)[:50], 'uid': uid}
+
+# ═══════════════════════════════════════════════════════════════
 # إضافة صديق مع إعادة المحاولة (Free Fire)
 # ═══════════════════════════════════════════════════════════════
 
@@ -258,7 +434,7 @@ async def async_add_fr_with_retry(target_id, token, uid, semaphore, client):
     url = 'https://clientbp.ggwhitehawk.com/RequestAddingFriend'
     headers = {
         'X-Unity-Version': '2018.4.11f1',
-        'ReleaseVersion': 'OB51',
+        'ReleaseVersion': 'OB52',
         'Content-Type': 'application/x-www-form-urlencoded',
         'X-GA': 'v1 1',
         'Authorization': f'Bearer {token}',
@@ -303,38 +479,34 @@ async def async_add_fr_single(target_id, token, uid):
         return await async_add_fr_with_retry(target_id, token, uid, semaphore, client)
 
 # ═══════════════════════════════════════════════════════════════
-# تغيير البايو مع إعادة المحاولة (Free Fire)
+# تغيير البايو مع إعادة المحاولة (باستخدام الدوال الجديدة)
 # ═══════════════════════════════════════════════════════════════
 
 async def async_change_bio_with_retry(uid, password, new_bio, region, semaphore, client):
-    import urllib.parse
-    encoded_bio = urllib.parse.quote(new_bio)
-    url = f"https://change-bio-api-lkteam.onrender.com/changebio?uid={uid}&password={password}&newbio={encoded_bio}&region={region}"
+    """تغيير البايو باستخدام الكود الجديد (يعمل بشكل متزامن ولكن نستخدم asyncio.to_thread)"""
     async with semaphore:
         for attempt in range(MAX_RETRIES):
+            if attempt > 0:
+                await asyncio.sleep(RETRY_DELAY)
             try:
-                if attempt > 0:
-                    await asyncio.sleep(RETRY_DELAY)
-                response = await client.get(url, timeout=90)
-                if response.status_code == 200:
-                    return {'status': 'نجاح', 'uid': uid, 'attempts': attempt + 1}
-                elif response.status_code == 429:
-                    await asyncio.sleep(RETRY_DELAY * 3)
+                # تشغيل الدالة المتزامنة في thread منفصل
+                result = await asyncio.to_thread(change_bio_sync, uid, password, new_bio)
+                if result.get('status') == 'نجاح':
+                    return result
+                # إذا فشل، نعيد المحاولة
+                if attempt < MAX_RETRIES - 1:
                     continue
-                else:
-                    if attempt < MAX_RETRIES - 1: continue
-                    return {'status': 'فشل', 'error': f'HTTP {response.status_code}', 'uid': uid, 'attempts': attempt + 1}
-            except httpx.TimeoutException:
-                if attempt < MAX_RETRIES - 1: continue
-                return {'status': 'خطأ', 'error': 'انتهاء المهلة', 'uid': uid, 'attempts': attempt + 1}
+                return result
             except Exception as e:
-                if attempt < MAX_RETRIES - 1: continue
-                return {'status': 'خطأ', 'error': str(e)[:30], 'uid': uid, 'attempts': attempt + 1}
-        return {'status': 'فشل', 'error': 'تجاوز الحد الأقصى للمحاولات', 'uid': uid, 'attempts': MAX_RETRIES}
+                if attempt < MAX_RETRIES - 1:
+                    continue
+                return {'status': 'خطأ', 'error': str(e)[:30], 'uid': uid}
+        return {'status': 'فشل', 'error': 'تجاوز الحد الأقصى للمحاولات', 'uid': uid}
 
 async def async_change_bio_single(uid, password, new_bio, region):
     semaphore = asyncio.Semaphore(1)
     async with httpx.AsyncClient(verify=False) as client:
+        # client غير مستخدم فعلياً، لكن نحتفظ بالواجهة للتوافق
         return await async_change_bio_with_retry(uid, password, new_bio, region, semaphore, client)
 
 # ═══════════════════════════════════════════════════════════════
@@ -465,7 +637,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ أنت لست لديك صلاحية!")
         return
     help_text = """
-🤖 *مدير نظام البوتات - الشمقمق (النسخة الديناميكية)*
+🤖 *مدير نظام البوتات - الشمقمق (النسخة الشمقمقية)*
 ━━━━━━━━━━━━━━━━━━━━━
 📋 *إدارة البوتات:*
 • `/on [اسم_المجلد]` - تشغيل بوت
@@ -749,7 +921,7 @@ async def cmd_delbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ تم حذف البوت {bot_folder} ومجلده {folder_path}")
 
 # ═══════════════════════════════════════════════════════════════
-# أوامر Free Fire (نفسها كما هي)
+# أوامر Free Fire
 # ═══════════════════════════════════════════════════════════════
 
 async def cmd_kb(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -937,9 +1109,9 @@ def run_telegram_bot(status_dict, stop_events, error_dict):
     app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CommandHandler("log", cmd_log))
     app.add_handler(CommandHandler("listbots", cmd_listbots))
-    app.add_handler(CommandHandler("addbot", cmd_addbot_request))      # أمر جديد
+    app.add_handler(CommandHandler("addbot", cmd_addbot_request))
     app.add_handler(CommandHandler("delbot", cmd_delbot))
-    app.add_handler(MessageHandler(filters.Document.ALL, handle_document))  # استقبال الملفات
+    app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_handler(CommandHandler("kb", cmd_kb))
     app.add_handler(CommandHandler("kball", cmd_kball))
     app.add_handler(CommandHandler("bio", cmd_bio))
@@ -954,6 +1126,26 @@ def run_telegram_bot(status_dict, stop_events, error_dict):
     app.run_polling(drop_pending_updates=True)
 
 # ═══════════════════════════════════════════════════════════════
+# خادم Flask لإبقاء الخدمة نشطة على Render
+# ═══════════════════════════════════════════════════════════════
+
+web_app = Flask(__name__)
+
+@web_app.route('/')
+def health_check():
+    return "Bot Controller is running", 200
+
+def run_web_server():
+    port = int(os.environ.get("PORT", 10000))
+    web_app.run(host="0.0.0.0", port=port, debug=False)
+
+# تشغيل الخادم في thread منفصل (يتم استدعاؤه قبل run_telegram_bot)
+def start_flask_thread():
+    web_thread = threading.Thread(target=run_web_server, daemon=True)
+    web_thread.start()
+    print(f"?? خادم HTTP يعمل على المنفذ {os.environ.get('PORT', 10000)}")
+
+# ═══════════════════════════════════════════════════════════════
 # الشمقمق
 # ═══════════════════════════════════════════════════════════════
 
@@ -963,6 +1155,9 @@ if __name__ == "__main__":
     print("=" * 50)
     ensure_cache_dir()
     ensure_log_dir()
+
+    # تشغيل خادم Flask (لإبقاء الخدمة على Render)
+    start_flask_thread()
 
     manager = Manager()
     status_dict = manager.dict()
