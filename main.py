@@ -158,33 +158,36 @@ def get_next_bot_folder():
     return f"bot{max_num+1}"
 
 def install_requirements(bot_folder):
-    """تثبيت المكتبات المطلوبة للبوت من requirements.txt (إن وجد)"""
     req_file = os.path.join(bot_folder, 'requirements.txt')
     if not os.path.exists(req_file):
-        return True, "لا يوجد requirements.txt"
+        return True, "✅ لا يوجد requirements.txt"
     
-    # إنشاء مجلد lib لتثبيت المكتبات المحلية
     lib_dir = os.path.join(bot_folder, 'lib')
     os.makedirs(lib_dir, exist_ok=True)
     
     try:
-        # تثبيت المكتبات باستخدام --target إلى lib_dir
-        cmd = [sys.executable, '-m', 'pip', 'install', '-r', req_file, '--target', lib_dir, '--upgrade']
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        print(f"[📦] جاري تثبيت المكتبات لـ {bot_folder}...")
+        cmd = [sys.executable, '-m', 'pip', 'install', '-r', req_file,
+               '--target', lib_dir, '--upgrade', '--no-cache-dir', '--no-deps']
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        
         if result.returncode == 0:
-            # إنشاء ملف sitecustomize.py لإضافة lib_dir إلى sys.path عند تشغيل البوت
+            print(f"[✅] تم تثبيت المكتبات بنجاح")
+            # إنشاء sitecustomize.py للتأكد من إضافة lib إلى sys.path
             sitecustomize = os.path.join(bot_folder, 'sitecustomize.py')
-            with open(sitecustomize, 'w') as f:
-                f.write(f"""import sys, os
+            with open(sitecustomize, 'w', encoding='utf-8') as f:
+                f.write("""import sys, os
 lib_path = os.path.join(os.path.dirname(__file__), 'lib')
 if lib_path not in sys.path:
     sys.path.insert(0, lib_path)
+print("✅ [sitecustomize] lib added to sys.path")
 """)
-            return True, f"تم تثبيت المكتبات بنجاح:\n{result.stdout[-500:]}"
+            return True, "✅ تم تثبيت المكتبات بنجاح"
         else:
-            return False, f"فشل تثبيت المكتبات:\n{result.stderr[-500:]}"
+            print(f"[❌] فشل pip:\n{result.stderr}")
+            return False, f"❌ فشل: {result.stderr[:500]}"
     except Exception as e:
-        return False, f"خطأ أثناء التثبيت: {str(e)}"
+        return False, str(e)
 
 def extract_and_setup_bot(zip_file_path):
     """
