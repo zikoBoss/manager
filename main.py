@@ -602,6 +602,7 @@ def run_single_bot(folder, filename, bot_id, status_dict, stop_event, error_dict
                 log.write(f"\n{'='*50}\n")
                 log.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] بدء تشغيل البوت {bot_id}\n")
                 log.flush()
+
                 # إعداد متغير البيئة PYTHONPATH ليشمل مجلد lib الخاص بالبوت
                 env = os.environ.copy()
                 lib_dir = os.path.join(folder, 'lib')
@@ -610,6 +611,10 @@ def run_single_bot(folder, filename, bot_id, status_dict, stop_event, error_dict
                         env['PYTHONPATH'] = lib_dir + os.pathsep + env['PYTHONPATH']
                     else:
                         env['PYTHONPATH'] = lib_dir
+                    log.write(f"[ℹ️] تم إضافة مجلد المكتبات: {lib_dir}\n")
+                else:
+                    log.write(f"[⚠️] مجلد المكتبات غير موجود: {lib_dir}\n")
+
                 process = subprocess.Popen(
                     [sys.executable, filename],
                     cwd=folder,
