@@ -31,8 +31,8 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # الإعدادات الرئيسية
 # ═══════════════════════════════════════════════════════════════
 
-TELEGRAM_BOT_TOKEN = "تكون الشمقمق هنا"
-ADMIN_IDS = [ايدي الشمقمق]
+TELEGRAM_BOT_TOKEN = "8598136584:AAFM_fzQv4x5mWFza_BAYtY_jhN1cXXxbqs"
+ADMIN_IDS = [6848455321]
 
 # ملفات التكوين
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "cache")
