@@ -1,6 +1,6 @@
-# ملف إدارة نظام البوتات - ZAKARIA (الإصدار شمقمق1)
+# ملف إدارة نظام البوتات - ZAKARIA (الإصدار شمقمق 1.0.2)
 # الشمقمق
-#تغيير الحقوق لن يجعل منك محترفا شمقمق عمك
+# تغيير الحقوق لن يجعل منك محترفا شمقمق عمك
 import multiprocessing
 from multiprocessing import Manager
 import subprocess
@@ -157,10 +157,39 @@ def get_next_bot_folder():
             continue
     return f"bot{max_num+1}"
 
+def install_requirements(bot_folder):
+    """تثبيت المكتبات المطلوبة للبوت من requirements.txt (إن وجد)"""
+    req_file = os.path.join(bot_folder, 'requirements.txt')
+    if not os.path.exists(req_file):
+        return True, "لا يوجد requirements.txt"
+    
+    # إنشاء مجلد lib لتثبيت المكتبات المحلية
+    lib_dir = os.path.join(bot_folder, 'lib')
+    os.makedirs(lib_dir, exist_ok=True)
+    
+    try:
+        # تثبيت المكتبات باستخدام --target إلى lib_dir
+        cmd = [sys.executable, '-m', 'pip', 'install', '-r', req_file, '--target', lib_dir, '--upgrade']
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        if result.returncode == 0:
+            # إنشاء ملف sitecustomize.py لإضافة lib_dir إلى sys.path عند تشغيل البوت
+            sitecustomize = os.path.join(bot_folder, 'sitecustomize.py')
+            with open(sitecustomize, 'w') as f:
+                f.write(f"""import sys, os
+lib_path = os.path.join(os.path.dirname(__file__), 'lib')
+if lib_path not in sys.path:
+    sys.path.insert(0, lib_path)
+""")
+            return True, f"تم تثبيت المكتبات بنجاح:\n{result.stdout[-500:]}"
+        else:
+            return False, f"فشل تثبيت المكتبات:\n{result.stderr[-500:]}"
+    except Exception as e:
+        return False, f"خطأ أثناء التثبيت: {str(e)}"
+
 def extract_and_setup_bot(zip_file_path):
     """
-    فك ضغط الملف في مجلد جديد وإرجاع (اسم_المجلد, الملف_الرئيسي)
-    أو (None, سبب_الفشل) في حال الفشل.
+    فك ضغط الملف في مجلد جديد وإرجاع (اسم_المجلد, الملف_الرئيسي, رسالة_التثبيت)
+    أو (None, سبب_الفشل, None) في حال الفشل.
     """
     new_folder = get_next_bot_folder()
     try:
@@ -173,13 +202,17 @@ def extract_and_setup_bot(zip_file_path):
                 break
         if not main_file:
             shutil.rmtree(new_folder)
-            return None, "لم يتم العثور على main.py"
+            return None, "لم يتم العثور على main.py", None
+        
+        # تثبيت المكتبات المطلوبة
+        install_success, install_msg = install_requirements(new_folder)
+        
         main_file_rel = os.path.relpath(main_file, new_folder)
-        return new_folder, main_file_rel
+        return new_folder, main_file_rel, install_msg
     except Exception as e:
         if os.path.exists(new_folder):
             shutil.rmtree(new_folder)
-        return None, str(e)
+        return None, str(e), None
 
 # ═══════════════════════════════════════════════════════════════
 # دوال التشفير الأساسية (لإضافة الصديق)
@@ -278,7 +311,7 @@ def get_fresh_token(uid, password):
                 "client_id": "100067",
                 "client_secret": ""
             }
-            r = session.post(url, headers=headers, data=data, timeout=45)  # زيادة المهلة
+            r = session.post(url, headers=headers, data=data, timeout=45)
             if r.status_code != 200:
                 print(f"[❌] فشل الاتصال بـ Garena: {r.status_code} (المحاولة {attempt+1})")
                 if attempt < MAX_RETRIES - 1:
@@ -343,7 +376,6 @@ def decrypt_bio(b):
     return unpad_bio(decryptor.update(b) + decryptor.finalize())
 
 def protobuf_decode(data):
-    """فك ترميز رسالة protobuf"""
     i, out = 0, {}
     while i < len(data):
         try:
@@ -373,7 +405,6 @@ def protobuf_decode(data):
     return out
 
 def inspect_token(access_token):
-    """التحقق من صحة التوكن وجلب open_id"""
     url = "https://100067.connect.garena.com/oauth/token/inspect"
     headers = {
         "Accept-Encoding": "gzip, deflate, br",
@@ -389,7 +420,6 @@ def inspect_token(access_token):
     return data.get("open_id"), data.get("platform")
 
 def build_login_data(access_token, open_id):
-    """بناء البيانات المشفرة لتسجيل الدخول إلى اللعبة"""
     template_hex = (
         "1a13323032352d30372d33302031343a31313a3230220966726565206669726528013a07"
         "322e3131342e324234416e64726f6964204f53203133202f204150492d33332028545031"
@@ -419,16 +449,13 @@ def build_login_data(access_token, open_id):
         "9a060134a2060134b20600"
     )
     data_bytes = bytes.fromhex(template_hex)
-    # استبدال الطابع الزمني
     timestamp = str(datetime.now())[:-7].encode()
     data_bytes = data_bytes.replace(b"2025-07-30 14:11:20", timestamp)
-    # استبدال access_token و open_id
     data_bytes = data_bytes.replace(b"c621f2d621430dac1a782a0dab64e6c80a974a6bc728cf2e6b1224d186c9b7af", access_token.encode())
     data_bytes = data_bytes.replace(b"9e71fabf43d88c06b79f548104c7fcb7", open_id.encode())
     return encrypt_bio(data_bytes)
 
 def get_game_token(access_token, open_id):
-    """الحصول على JWT الخاص باللعبة باستخدام access_token"""
     payload = build_login_data(access_token, open_id)
     url = "https://loginbp.common.ggbluefox.com/MajorLogin"
     headers = {
@@ -452,7 +479,6 @@ def get_game_token(access_token, open_id):
     return token.strip()
 
 def set_bio_with_jwt(jwt, text):
-    """تغيير البايو باستخدام JWT"""
     raw = b"\x10\x11\x42" + bytes([len(text.encode())]) + text.encode() + b"\x48\x01"
     url = "https://clientbp.ggpolarbear.com/UpdateSocialBasicInfo"
     headers = {
@@ -470,8 +496,7 @@ def set_bio_with_jwt(jwt, text):
     return r.status_code
 
 def change_bio_sync(uid, password, new_bio):
-    """تغيير البايو باستخدام uid/password"""
-    jwt = get_jwt(uid, password)  # JWT اللعبة مباشرة
+    jwt = get_jwt(uid, password)
     if not jwt:
         return {'status': 'فشل', 'error': 'فشل في الحصول على JWT', 'uid': uid}
     try:
@@ -577,13 +602,22 @@ def run_single_bot(folder, filename, bot_id, status_dict, stop_event, error_dict
                 log.write(f"\n{'='*50}\n")
                 log.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] بدء تشغيل البوت {bot_id}\n")
                 log.flush()
+                # إعداد متغير البيئة PYTHONPATH ليشمل مجلد lib الخاص بالبوت
+                env = os.environ.copy()
+                lib_dir = os.path.join(folder, 'lib')
+                if os.path.exists(lib_dir):
+                    if 'PYTHONPATH' in env:
+                        env['PYTHONPATH'] = lib_dir + os.pathsep + env['PYTHONPATH']
+                    else:
+                        env['PYTHONPATH'] = lib_dir
                 process = subprocess.Popen(
                     [sys.executable, filename],
                     cwd=folder,
                     stdout=log,
                     stderr=subprocess.STDOUT,
                     bufsize=1,
-                    universal_newlines=True
+                    universal_newlines=True,
+                    env=env
                 )
                 bot_subprocesses[bot_id] = process
                 time.sleep(5)
@@ -684,7 +718,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ أنت لست لديك صلاحية!")
         return
     help_text = """
-🤖 *مدير نظام البوتات - الشمقمق (الإصدار شمقمق 1.0.1)*
+🤖 *مدير نظام البوتات - الشمقمق (شمقمق 1.0.2)*
 ━━━━━━━━━━━━━━━━━━━━━
 📋 *إدارة البوتات:*
 • `/on [اسم_المجلد]` - تشغيل بوت
@@ -696,7 +730,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 • `/status` - حالة البوتات
 • `/log [اسم_المجلد]` - عرض السجل
 • `/listbots` - قائمة البوتات المسجلة
-• `/addbot` - لاستقبال ملف ZIP لإضافة بوت جديد
+• `/addbot` - لاستقبال ملف ZIP لإضافة بوت جديد (يدعم تثبيت المكتبات تلقائياً)
 • `/delbot [اسم_المجلد]` - حذف بوت
 ━━━━━━━━━━━━━━━━━━━━━
 🎮 *Free Fire:*
@@ -719,7 +753,7 @@ async def cmd_addbot_request(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text("⛔ ليس لديك صلاحية!")
         return
     context.user_data['waiting_for_bot_zip'] = True
-    await update.message.reply_text("📦 أرسل ملف ZIP الذي يحتوي على `main.py` (الملف الرئيسي للبوت).", parse_mode='Markdown')
+    await update.message.reply_text("📦 أرسل ملف ZIP الذي يحتوي على `main.py` (الملف الرئيسي للبوت).\nإذا كان يحتاج مكتبات، أضف `requirements.txt` في جذر الملف.", parse_mode='Markdown')
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -738,7 +772,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     temp_zip = os.path.join(CACHE_DIR, f"temp_{document.file_id}.zip")
     await file.download_to_drive(temp_zip)
     await update.message.reply_text("⏳ جاري فك الضغط وإعداد البوت...")
-    folder, main_file = extract_and_setup_bot(temp_zip)
+    folder, main_file, install_msg = extract_and_setup_bot(temp_zip)
     os.remove(temp_zip)
     if not folder:
         await update.message.reply_text(f"❌ فشل في إعداد البوت: {main_file}")
@@ -755,7 +789,10 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     stop_events = context.bot_data.get('stop_events')
     error_dict = context.bot_data.get('error_dict')
     success, msg = start_bot_process(folder, status_dict, stop_events, error_dict)
-    await update.message.reply_text(f"✅ تمت إضافة البوت `{folder}`\n📁 {folder}\n🔧 {main_file}\n{msg}", parse_mode='Markdown')
+    reply = f"✅ تمت إضافة البوت `{folder}`\n📁 {folder}\n🔧 {main_file}\n{msg}"
+    if install_msg:
+        reply += f"\n\n📦 *تثبيت المكتبات:*\n{install_msg}"
+    await update.message.reply_text(reply, parse_mode='Markdown')
 
 async def cmd_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
