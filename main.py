@@ -54,8 +54,8 @@ RESTART_INTERVAL = 1800
 
 MAX_CONCURRENT_REQUESTS = 2
 DELAY_BETWEEN_REQUESTS = 1.5
-MAX_RETRIES = 3
-RETRY_DELAY = 2
+MAX_RETRIES = 5
+RETRY_DELAY = 4
 REQUEST_TIMEOUT = 60
 
 # ═══════════════════════════════════════════════════════════════
@@ -235,7 +235,6 @@ def TOKEN_MAKER(OLD_ACCESS_TOKEN, NEW_ACCESS_TOKEN, OLD_OPEN_ID, NEW_OPEN_ID, ui
         'Content-Type': 'application/x-www-form-urlencoded',
         'X-GA': 'v1 1',
         'Authorization': 'Bearer ...',
-        'Content-Length': '928',
         'User-Agent': 'Dalvik/2.1.0',
         'Host': 'loginbp.ggpolarbear.com',
         'Connection': 'Keep-Alive',
@@ -261,38 +260,58 @@ def TOKEN_MAKER(OLD_ACCESS_TOKEN, NEW_ACCESS_TOKEN, OLD_OPEN_ID, NEW_OPEN_ID, ui
 
 def get_fresh_token(uid, password):
     """الحصول على JWT اللعبة باستخدام uid و password (نفس index.py)"""
-    try:
-        # الخطوة 1: الحصول على access_token من Garena
-        url = "https://100067.connect.garena.com/oauth/guest/token/grant"
-        headers = {
-            "Host": "100067.connect.garena.com",
-            "User-Agent": "GarenaMSDK/4.0.19P4",
-            "Content-Type": "application/x-www-form-urlencoded"
-        }
-        data = {
-            "uid": uid,
-            "password": password,
-            "response_type": "token",
-            "client_type": "2",
-            "client_id": "100067",
-            "client_secret": ""
-        }
-        r = session.post(url, headers=headers, data=data, timeout=30)
-        if r.status_code != 200:
-            print(f"[❌] فشل الاتصال بـ Garena: {r.status_code}")
+    for attempt in range(MAX_RETRIES):
+        try:
+            print(f"[ℹ️] محاولة {attempt+1} للحصول على التوكن لـ {uid}")
+            # الخطوة 1: الحصول على access_token من Garena
+            url = "https://100067.connect.garena.com/oauth/guest/token/grant"
+            headers = {
+                "Host": "100067.connect.garena.com",
+                "User-Agent": "GarenaMSDK/4.0.19P4",
+                "Content-Type": "application/x-www-form-urlencoded"
+            }
+            data = {
+                "uid": uid,
+                "password": password,
+                "response_type": "token",
+                "client_type": "2",
+                "client_id": "100067",
+                "client_secret": ""
+            }
+            r = session.post(url, headers=headers, data=data, timeout=45)  # زيادة المهلة
+            if r.status_code != 200:
+                print(f"[❌] فشل الاتصال بـ Garena: {r.status_code} (المحاولة {attempt+1})")
+                if attempt < MAX_RETRIES - 1:
+                    time.sleep(RETRY_DELAY)
+                    continue
+                return None
+            d = r.json()
+            NEW_ACCESS_TOKEN = d.get("access_token")
+            NEW_OPEN_ID = d.get("open_id")
+            if not NEW_ACCESS_TOKEN or not NEW_OPEN_ID:
+                print("[❌] لم يتم استلام التوكن من Garena")
+                if attempt < MAX_RETRIES - 1:
+                    time.sleep(RETRY_DELAY)
+                    continue
+                return None
+            # الخطوة 2: إنشاء JWT اللعبة باستخدام TOKEN_MAKER
+            jwt = TOKEN_MAKER(OLD_ACCESS_TOKEN, NEW_ACCESS_TOKEN, OLD_OPEN_ID, NEW_OPEN_ID, uid)
+            if jwt:
+                print(f"[✅] تم الحصول على JWT بنجاح للمحاولة {attempt+1}")
+                return jwt
+            else:
+                print(f"[❌] TOKEN_MAKER فشل في المحاولة {attempt+1}")
+                if attempt < MAX_RETRIES - 1:
+                    time.sleep(RETRY_DELAY)
+                    continue
+                return None
+        except Exception as e:
+            print(f"[❌] خطأ في get_fresh_token (المحاولة {attempt+1}): {e}")
+            if attempt < MAX_RETRIES - 1:
+                time.sleep(RETRY_DELAY)
+                continue
             return None
-        d = r.json()
-        NEW_ACCESS_TOKEN = d.get("access_token")
-        NEW_OPEN_ID = d.get("open_id")
-        if not NEW_ACCESS_TOKEN or not NEW_OPEN_ID:
-            print("[❌] لم يتم استلام التوكن من Garena")
-            return None
-        # الخطوة 2: إنشاء JWT اللعبة باستخدام TOKEN_MAKER
-        jwt = TOKEN_MAKER(OLD_ACCESS_TOKEN, NEW_ACCESS_TOKEN, OLD_OPEN_ID, NEW_OPEN_ID, uid)
-        return jwt
-    except Exception as e:
-        print(f"[❌] خطأ في get_fresh_token: {e}")
-        return None
+    return None
 
 def get_jwt(uid, password):
     """الحصول على JWT اللعبة باستخدام uid و password (واجهة موحدة)"""
