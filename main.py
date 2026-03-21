@@ -22,7 +22,7 @@ from pathlib import Path
 
 # مكتبات تليجرام
 from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # تعطيل التحذيرات المتعلقة بشهادات SSL
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -31,8 +31,8 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # الإعدادات الرئيسية
 # ═══════════════════════════════════════════════════════════════
 
-TELEGRAM_BOT_TOKEN = "8598136584:AAFM_fzQv4x5mWFza_BAYtY_jhN1cXXxbqs"
-ADMIN_IDS = [6848455321]
+TELEGRAM_BOT_TOKEN = "تكون الشمقمق هنا"
+ADMIN_IDS = [ايدي الشمقمق]
 
 # ملفات التكوين
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "cache")
@@ -477,7 +477,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 • `/status` - حالة البوتات
 • `/log [اسم_المجلد]` - عرض السجل
 • `/listbots` - قائمة البوتات المسجلة
-• `/addbot` (مع ملف ZIP) - إضافة بوت جديد
+• `/addbot` - لاستقبال ملف ZIP لإضافة بوت جديد (سيرسل البوت طلب الملف)
 • `/delbot [اسم_المجلد]` - حذف بوت
 ━━━━━━━━━━━━━━━━━━━━━
 🎮 *Free Fire:*
@@ -493,6 +493,70 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 • `/clearacc` - حذف الكل
 """
     await update.message.reply_text(help_text, parse_mode='Markdown')
+
+async def cmd_addbot_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """يطلب من المستخدم إرسال ملف ZIP لإضافة بوت جديد"""
+    user_id = update.effective_user.id
+    if not is_admin(user_id):
+        await update.message.reply_text("⛔ ليس لديك صلاحية!")
+        return
+
+    # تخزين حالة انتظار الملف للمستخدم
+    context.user_data['waiting_for_bot_zip'] = True
+    await update.message.reply_text("📦 أرسل ملف ZIP الذي يحتوي على `main.py` (الملف الرئيسي للبوت).", parse_mode='Markdown')
+
+async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة الملفات المرسلة بعد طلب /addbot"""
+    user_id = update.effective_user.id
+    if not is_admin(user_id):
+        await update.message.reply_text("⛔ ليس لديك صلاحية!")
+        return
+
+    # التحقق من أن المستخدم في حالة انتظار الملف
+    if not context.user_data.get('waiting_for_bot_zip', False):
+        # إذا لم يكن ينتظر ملفاً، نهمل
+        return
+
+    # مسح حالة الانتظار
+    context.user_data['waiting_for_bot_zip'] = False
+
+    document = update.message.document
+    if not document or not document.file_name.endswith('.zip'):
+        await update.message.reply_text("❗ يرجى إرسال ملف بصيغة ZIP فقط.")
+        return
+
+    # تحميل الملف
+    await update.message.reply_text("⏳ جاري تحميل الملف...")
+    file = await context.bot.get_file(document.file_id)
+    temp_zip = os.path.join(CACHE_DIR, f"temp_{document.file_id}.zip")
+    await file.download_to_drive(temp_zip)
+
+    # فك الضغط وإعداد البوت
+    await update.message.reply_text("⏳ جاري فك الضغط وإعداد البوت...")
+    folder, main_file = extract_and_setup_bot(temp_zip)
+    os.remove(temp_zip)
+
+    if not folder:
+        await update.message.reply_text(f"❌ فشل في إعداد البوت: {main_file}")
+        return
+
+    # إضافة البوت إلى القائمة
+    bots = load_bots_config()
+    new_bot = {
+        "folder": folder,
+        "main_file": main_file,
+        "added_at": time.strftime("%Y-%m-%d %H:%M:%S")
+    }
+    bots.append(new_bot)
+    save_bots_config(bots)
+
+    # تشغيل البوت الجديد
+    status_dict = context.bot_data.get('status_dict')
+    stop_events = context.bot_data.get('stop_events')
+    error_dict = context.bot_data.get('error_dict')
+    success, msg = start_bot_process(folder, status_dict, stop_events, error_dict)
+
+    await update.message.reply_text(f"✅ تمت إضافة البوت `{folder}`\n📁 {folder}\n🔧 {main_file}\n{msg}", parse_mode='Markdown')
 
 async def cmd_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -650,53 +714,6 @@ async def cmd_listbots(update: Update, context: ContextTypes.DEFAULT_TYPE):
         status = "🟢 يعمل" if (bot['folder'] in bot_processes and bot_processes[bot['folder']].is_alive()) else "🔴 متوقف"
         list_text += f"{i}. `{bot['folder']}` - {status}\n"
     await update.message.reply_text(list_text, parse_mode='Markdown')
-
-async def cmd_addbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if not is_admin(user_id):
-        await update.message.reply_text("⛔ ليس لديك صلاحية!")
-        return
-
-    if not update.message.document:
-        await update.message.reply_text("❗ يرجى إرسال ملف ZIP مضغوط مع الأمر /addbot")
-        return
-
-    document = update.message.document
-    if not document.file_name.endswith('.zip'):
-        await update.message.reply_text("❗ الملف يجب أن يكون بصيغة ZIP")
-        return
-
-    # تحميل الملف
-    file = await context.bot.get_file(document.file_id)
-    temp_zip = os.path.join(CACHE_DIR, f"temp_{document.file_id}.zip")
-    await file.download_to_drive(temp_zip)
-
-    # فك الضغط وإعداد البوت
-    await update.message.reply_text("⏳ جاري فك الضغط وإعداد البوت...")
-    folder, main_file = extract_and_setup_bot(temp_zip)
-    os.remove(temp_zip)
-
-    if not folder:
-        await update.message.reply_text(f"❌ فشل في إعداد البوت: {main_file}")
-        return
-
-    # إضافة البوت إلى القائمة
-    bots = load_bots_config()
-    new_bot = {
-        "folder": folder,
-        "main_file": main_file,
-        "added_at": time.strftime("%Y-%m-%d %H:%M:%S")
-    }
-    bots.append(new_bot)
-    save_bots_config(bots)
-
-    # تشغيل البوت الجديد
-    status_dict = context.bot_data.get('status_dict')
-    stop_events = context.bot_data.get('stop_events')
-    error_dict = context.bot_data.get('error_dict')
-    success, msg = start_bot_process(folder, status_dict, stop_events, error_dict)
-
-    await update.message.reply_text(f"✅ تمت إضافة البوت `{folder}`\n📁 {folder}\n🔧 {main_file}\n{msg}", parse_mode='Markdown')
 
 async def cmd_delbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -920,8 +937,9 @@ def run_telegram_bot(status_dict, stop_events, error_dict):
     app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CommandHandler("log", cmd_log))
     app.add_handler(CommandHandler("listbots", cmd_listbots))
-    app.add_handler(CommandHandler("addbot", cmd_addbot))
+    app.add_handler(CommandHandler("addbot", cmd_addbot_request))      # أمر جديد
     app.add_handler(CommandHandler("delbot", cmd_delbot))
+    app.add_handler(MessageHandler(filters.Document.ALL, handle_document))  # استقبال الملفات
     app.add_handler(CommandHandler("kb", cmd_kb))
     app.add_handler(CommandHandler("kball", cmd_kball))
     app.add_handler(CommandHandler("bio", cmd_bio))
@@ -932,7 +950,7 @@ def run_telegram_bot(status_dict, stop_events, error_dict):
     app.add_handler(CommandHandler("clearacc", cmd_clearacc))
 
     print("🤖 تم تشغيل مدير البوتات بنجاح!")
-    print(f"📊 يدير {len(load_bots_config())} بوت Free Fire")
+    print(f"📊 يدير {len(load_bots_config())} بوت")
     app.run_polling(drop_pending_updates=True)
 
 # ═══════════════════════════════════════════════════════════════
