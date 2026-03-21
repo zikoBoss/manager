@@ -1,4 +1,4 @@
-# المكتبات الأساسية
+# المكتبات الأساسية للمدير
 requests>=2.31.0
 urllib3>=2.0.0
 aiohttp>=3.9.0
@@ -29,3 +29,8 @@ colorama>=0.4.6
 
 # بوت التلغرام (للمدير)
 python-telegram-bot>=20.7
+
+# ===== المكتبات الإضافية المطلوبة للبوت المستضاف (Free Fire) =====
+aiogram
+magic_filter
+pydantic
