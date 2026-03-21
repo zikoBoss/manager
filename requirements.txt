@@ -1,0 +1,30 @@
+# المكتبات الأساسية
+requests>=2.31.0
+urllib3>=2.0.0
+aiohttp>=3.9.0
+httpx>=0.25.0
+PyJWT>=2.8.0
+
+# التشفير والأمان
+pycryptodome>=3.19.0
+
+# بروتوكول بافر (Protobuf)
+protobuf>=4.25.0
+protobuf-decoder==0.4.0
+google>=3.0.0
+
+# أدوات النظام والمراقبة
+psutil>=5.9.0
+
+# الوقت والتاريخ
+pytz>=2023.3
+
+# الويب والـ API
+flask>=3.0.0
+cfonts==1.5.2
+
+# معالجة البيانات
+colorama>=0.4.6
+
+# بوت التلغرام (يستخدمه المدير)
+python-telegram-bot>=20.7
