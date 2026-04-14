@@ -34,3 +34,11 @@ python-telegram-bot>=20.7
 aiogram
 magic_filter
 pydantic
+python-telegram-bot[job-queue]==20.8
+aiohttp==3.9.5
+python-dotenv==1.0.1
+pycryptodome==3.20.0
+protobuf==4.25.3
+google-play-scraper
+colorama==0.4.6
+psutil==5.9.8
