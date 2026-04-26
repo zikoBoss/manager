@@ -1,34 +1,13 @@
-# HTTP
+python-telegram-bot[job-queue]==20.8
 requests>=2.31.0
 aiohttp==3.9.5
 httpx>=0.25.0
-
-# Security
 PyJWT>=2.8.0
 pycryptodome==3.20.0
 cryptography>=41.0.0
-
-# Protobuf
 protobuf==4.25.3
-protobuf-decoder==0.4.0
-
-# System
 psutil==5.9.8
 pytz>=2023.3
-
-# Web
 flask>=3.0.0
-
-# Utils
 colorama==0.4.6
-cfonts==1.5.2
-
-# Telegram (اختار وحدة فقط)
-python-telegram-bot[job-queue]==20.8
-# أو بدلها بـ aiogram وخدم غير بها
-
-# Extra
-magic_filter
-pydantic
 python-dotenv==1.0.1
-google-play-scraper
