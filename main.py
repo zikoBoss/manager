@@ -30,7 +30,7 @@ except ImportError:
     HAS_PSUTIL = False
 
 #عدل اي شيء لا مشكلة ابدل #@ZikoB0SS _AYOUB _ZAKARIA _FPI_SX_TEM
-TELEGRAM_BOT_TOKEN = "8301372114:AAGx78W1ThiF033soCLuXISkAd2UttgEC8E"
+TELEGRAM_BOT_TOKEN = "8598136584:AAHToYmhdD5gs_f0AuBvnPeYHEOMsZLCfZM"
 ADMIN_IDS = [6848455321, 7375963526]
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
