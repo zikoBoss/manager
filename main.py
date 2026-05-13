@@ -353,7 +353,6 @@ async def show_main_menu(message):
     keyboard = [
         [InlineKeyboardButton("📊 لوحة التحكم", callback_data="dashboard")],
         [InlineKeyboardButton("🤖 إدارة البوتات", callback_data="manage_bots")],
-        [InlineKeyboardButton("🛑 إيقاف المدير", callback_data="confirm_stop_manager")],
         [InlineKeyboardButton("❌ إغلاق", callback_data="close_message")],
     ]
     await message.reply_text(
